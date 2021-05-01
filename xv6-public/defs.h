@@ -52,10 +52,6 @@ struct inode*   nameiparent(char*, char*);
 int             readi(struct inode*, char*, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
-int             removeSwapFile(struct proc*);
-int             createSwapFile(struct proc*);
-int             writeToSwapFile(struct proc*, char*, uint, uint);
-int             readFromSwapFile(struct proc*, char*, uint, uint);
 
 // ide.c
 void            ideinit(void);
