@@ -96,6 +96,13 @@ exec(char *path, char **argv)
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;
+  curproc->memPagesCnt = 0;
+  for(int i=0;i<MAX_TOTAL_PAGES;++i){
+    curproc->pagedOut[i] = 0;
+  }
+  curproc->pagedOutCnt = 0;
+  curproc->pageFaultCnt = 0;
+  curproc->totalPagedOutCnt = 0;
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
