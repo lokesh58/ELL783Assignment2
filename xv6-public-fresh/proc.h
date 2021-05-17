@@ -56,8 +56,9 @@ struct proc {
   uint memPages[MAX_PSYC_PAGES];  //meta data about pages in memory
   uint pagedOut[MAX_TOTAL_PAGES]; //meta data about pages in backing store (does not include pages in memory)
   uint memPagesCnt;            // Number of pages in memory
-  uint pagesOutCnt;            // Current paged out
-  uint totalPagedOut;          // Total pages which were pages out
+  uint pagedOutCnt;            // Current paged out
+  uint pageFaultCnt;           // Number of times page fault occured
+  uint totalPagedOutCnt;       // Total number of pages which were paged out
 };
 
 // Process memory is laid out contiguously, low addresses first:
