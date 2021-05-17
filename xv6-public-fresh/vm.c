@@ -89,7 +89,7 @@ void pageOut(struct proc *p) {
   p->totalPagedOutCnt += 1;
   kfree(v);
   *pte &= ~PTE_P;
-  *pte &= PTE_PG;
+  *pte |= PTE_PG;
 #endif //NONE
 }
 
@@ -441,16 +441,23 @@ copyuvm(pde_t *pgdir, uint sz)
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
-    if(!(*pte & PTE_P))
+    if(!(*pte & (PTE_P|PTE_PG)))
       panic("copyuvm: page not present");
-    pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 0) < 0) {
-      kfree(mem);
-      goto bad;
+    if(*pte & PTE_P){
+      pa = PTE_ADDR(*pte);
+      flags = PTE_FLAGS(*pte);
+      if((mem = kalloc()) == 0)
+        goto bad;
+      memmove(mem, (char*)P2V(pa), PGSIZE);
+      if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 0) < 0) {
+        kfree(mem);
+        goto bad;
+      }
+    }else{
+      pte = walkpgdir(d, (void*)i, 1);
+      if(pte == 0)
+        goto bad;
+      *pte |= PTE_PG;
     }
   }
   return d;
