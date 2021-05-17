@@ -95,16 +95,19 @@ void pageOut(struct proc *p) {
 
 void addPageMetaData(struct proc *p, uint va) {
   if(p == 0) return;
+#ifndef NONE
   if(p->pid > 2){
     while(p->memPagesCnt >= MAX_PSYC_PAGES)
       pageOut(p);
     p->memPages[p->memPagesCnt] = va; //NFU counter is 0 initially
   }
+#endif //NONE
   p->memPagesCnt += 1;
 }
 
 void removePageMetaData(struct proc *p, uint va) {
   if(p == 0) return;
+#ifndef NONE
   if(p->pid > 2){
     int i;
     for(i=0;i < p->memPagesCnt; ++i){
@@ -118,10 +121,12 @@ void removePageMetaData(struct proc *p, uint va) {
       p->memPages[j-1] = p->memPages[j];
     }
   }
+#endif //NONE
   p->memPagesCnt -= 1;
 }
 
 void removePagedOutMetaData(struct proc *p, uint va) {
+#ifndef NONE
   if(p == 0) return;
   if(p->pid <= 2)
     panic("removePagedOutMetaData: init or shell trying to remove paged out data");
@@ -133,6 +138,7 @@ void removePagedOutMetaData(struct proc *p, uint va) {
     }
   }
   panic("removePagedOutMetaData: va not found");
+#endif //NONE
 }
 
 // Create PTEs for virtual addresses starting at va that refer to
@@ -163,6 +169,7 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm, int addMetaData)
 
 //Helps to add the page to memory from swapFile
 void pageIn(struct proc *p, uint va) {
+#ifndef NONE
   if(p == 0 || p->pid <= 2) return;
   while(p->memPagesCnt >= MAX_PSYC_PAGES)
     pageOut(p);
@@ -181,6 +188,7 @@ void pageIn(struct proc *p, uint va) {
   p->pagedOutCnt -= 1;
   if(mappages(p->pgdir, (char*)va, PGSIZE, V2P(mem), PTE_W|PTE_U, 1)==-1)
     panic("pageIn: could not add page to memory");
+#endif //NONE
 }
 
 // There is one page table per process, plus one that's used when

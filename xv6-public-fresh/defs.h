@@ -179,7 +179,7 @@ void            uartintr(void);
 void            uartputc(int);
 
 // vm.c
-pte_t*          walkpgdir(pde_t*, const void*, int);
+pde_t*          walkpgdir(pde_t*, const void*, int);
 void            seginit(void);
 void            kvmalloc(void);
 pde_t*          setupkvm(void);
