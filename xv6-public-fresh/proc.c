@@ -128,6 +128,14 @@ userinit(void)
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
+  createSwapFile(p);
+  for(int i=0;i<MAX_TOTAL_PAGES;++i){
+    p->pagedOut[i]=0;
+  }
+  p->memPagesCnt=0;
+  p->pagedOutCnt=0;
+  p->pageFaultCnt=0;
+  p->totalPagedOutCnt=0;
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
   memset(p->tf, 0, sizeof(*p->tf));
