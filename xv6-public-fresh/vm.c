@@ -54,11 +54,92 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
   return &pgtab[PTX(va)];
 }
 
+int selectPage(struct proc *p) {
+  return 0;
+}
+
+//Pages out one page to swapFile of the process
+//if maximum amount of pages in memory
+void pageOut(struct proc *p) {
+#ifndef NONE //only page out if SELECTION!=NONE
+  if(p == 0 || p->pid <= 2 || p->memPagesCnt < MAX_PSYC_PAGES)
+    return; //p->pid <= 2 means the process is either init or shell
+  int pgToRem = selectPage(p);
+  uint va = V_ADDR(p->memPages[pgToRem]);
+  for(int i=pgToRem+1; i < MAX_PSYC_PAGES; ++i){
+    p->memPages[i-1] = p->memPages[i];
+  }
+  p->memPagesCnt -= 1;
+  pte_t *pte = walkpgdir(p->pgdir, (char*)va, 0);
+  if(!pte || !(*pte & PTE_P))
+    panic("page to swap out not in memory");
+  int pos;
+  for(pos=0; pos < MAX_TOTAL_PAGES; ++pos){
+    if(!(p->pagedOut[pos] & PTE_P)) break;
+  }
+  if(pos == MAX_TOTAL_PAGES)
+    panic("could not find empty place in swap file");
+  uint pa = PTE_ADDR(*pte);
+  if(pa == 0)
+    panic("kfree");
+  char *v = P2V(pa);
+  writeToSwapFile(p, v, pos*PGSIZE, PGSIZE);
+  p->pagedOut[pos] = va | PTE_P;
+  p->pagedOutCnt += 1;
+  p->totalPagedOutCnt += 1;
+  kfree(v);
+  *pte &= ~PTE_P;
+  *pte &= PTE_PG;
+#endif //NONE
+}
+
+void addPageMetaData(struct proc *p, uint va) {
+  if(p == 0) return;
+  if(p->pid > 2){
+    while(p->memPagesCnt >= MAX_PSYC_PAGES)
+      pageOut(p);
+    p->memPages[p->memPagesCnt] = va; //NFU counter is 0 initially
+  }
+  p->memPagesCnt += 1;
+}
+
+void removePageMetaData(struct proc *p, uint va) {
+  if(p == 0) return;
+  if(p->pid > 2){
+    int i;
+    for(i=0;i < p->memPagesCnt; ++i){
+      if(V_ADDR(p->memPages[i]) == va){
+        break;
+      }
+    }
+    if(i == p->memPagesCnt)
+      panic("removePageMetaData: va not found");
+    for(int j=i+1;j < p->memPagesCnt; ++j){
+      p->memPages[j-1] = p->memPages[j];
+    }
+  }
+  p->memPagesCnt -= 1;
+}
+
+void removePagedOutMetaData(struct proc *p, uint va) {
+  if(p == 0) return;
+  if(p->pid <= 2)
+    panic("removePagedOutMetaData: init or shell trying to remove paged out data");
+  for(int i=0; i<MAX_TOTAL_PAGES; ++i){
+    if((p->pagedOut[i] & PTE_P) && V_ADDR(p->pagedOut[i]) == va){
+      p->pagedOut[i] = 0;
+      p->pagedOutCnt -= 1;
+      return;
+    }
+  }
+  panic("removePagedOutMetaData: va not found");
+}
+
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
 static int
-mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
+mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm, int addMetaData)
 {
   char *a, *last;
   pte_t *pte;
@@ -71,12 +152,35 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
     if(*pte & PTE_P)
       panic("remap");
     *pte = pa | perm | PTE_P;
+    if(addMetaData) addPageMetaData(myproc(), (uint)a);
     if(a == last)
       break;
     a += PGSIZE;
     pa += PGSIZE;
   }
   return 0;
+}
+
+//Helps to add the page to memory from swapFile
+void pageIn(struct proc *p, uint va) {
+  if(p == 0 || p->pid <= 2) return;
+  while(p->memPagesCnt >= MAX_PSYC_PAGES)
+    pageOut(p);
+  int pos;
+  for(pos=0; pos < MAX_TOTAL_PAGES; ++pos) {
+    if((p->pagedOut[pos] & PTE_P) && V_ADDR(p->pagedOut[pos]) == va)
+      break;
+  }
+  if(pos == MAX_TOTAL_PAGES)
+    panic("pageIn: va not in swapFile");
+  char *mem = kalloc();
+  if(mem == 0)
+    panic("pageIn: out of space");
+  readFromSwapFile(p, mem, pos*PGSIZE, PGSIZE);
+  p->pagedOut[pos] = 0;
+  p->pagedOutCnt -= 1;
+  if(mappages(p->pgdir, (char*)va, PGSIZE, V2P(mem), PTE_W|PTE_U, 1)==-1)
+    panic("pageIn: could not add page to memory");
 }
 
 // There is one page table per process, plus one that's used when
@@ -128,7 +232,7 @@ setupkvm(void)
     panic("PHYSTOP too high");
   for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
-                (uint)k->phys_start, k->perm) < 0) {
+                (uint)k->phys_start, k->perm, 0) < 0) {
       freevm(pgdir);
       return 0;
     }
@@ -188,7 +292,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
     panic("inituvm: more than a page");
   mem = kalloc();
   memset(mem, 0, PGSIZE);
-  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U);
+  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U, 1);
   memmove(mem, init, sz);
 }
 
@@ -234,13 +338,13 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
     mem = kalloc();
     if(mem == 0){
       cprintf("allocuvm out of memory\n");
-      deallocuvm(pgdir, newsz, oldsz);
+      deallocuvm(pgdir, newsz, oldsz, 1);
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
+    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U, 1) < 0){
       cprintf("allocuvm out of memory (2)\n");
-      deallocuvm(pgdir, newsz, oldsz);
+      deallocuvm(pgdir, newsz, oldsz, 1);
       kfree(mem);
       return 0;
     }
@@ -253,7 +357,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 // need to be less than oldsz.  oldsz can be larger than the actual
 // process size.  Returns the new process size.
 int
-deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+deallocuvm(pde_t *pgdir, uint oldsz, uint newsz, int remMetaData)
 {
   pte_t *pte;
   uint a, pa;
@@ -273,6 +377,10 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       char *v = P2V(pa);
       kfree(v);
       *pte = 0;
+      if(remMetaData) removePageMetaData(myproc(), (uint)a);
+    } else if((*pte & PTE_PG) != 0){
+      if(remMetaData) removePagedOutMetaData(myproc(), (uint)a);
+      *pte = 0;
     }
   }
   return newsz;
@@ -287,7 +395,7 @@ freevm(pde_t *pgdir)
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, KERNBASE, 0);
+  deallocuvm(pgdir, KERNBASE, 0, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P){
       char * v = P2V(PTE_ADDR(pgdir[i]));
@@ -332,7 +440,7 @@ copyuvm(pde_t *pgdir, uint sz)
     if((mem = kalloc()) == 0)
       goto bad;
     memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
+    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags, 0) < 0) {
       kfree(mem);
       goto bad;
     }
