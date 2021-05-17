@@ -88,6 +88,7 @@ trap(struct trapframe *tf)
     }
     struct proc *p = myproc();
     if(tf->trapno == T_PGFLT){
+      p->pageFaultCnt += 1;
       uint va = (uint)rcr2();
       pte_t *pte = walkpgdir(p->pgdir, (char*)va, 0);
       if(pte && (*pte & PTE_PG)) {
