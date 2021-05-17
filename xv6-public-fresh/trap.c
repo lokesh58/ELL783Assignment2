@@ -86,6 +86,15 @@ trap(struct trapframe *tf)
               tf->trapno, cpuid(), tf->eip, rcr2());
       panic("trap");
     }
+    struct proc *p = myproc();
+    if(tf->trapno == T_PGFLT){
+      uint va = (uint)rcr2();
+      pte_t *pte = walkpgdir(p->pgdir, (char*)va, 0);
+      if(pte && (*pte & PTE_PG)) {
+        pageIn(p, va);
+        break;
+      }
+    }
     // In user space, assume process misbehaved.
     cprintf("pid %d %s: trap %d err %d on cpu %d "
             "eip 0x%x addr 0x%x--kill proc\n",
