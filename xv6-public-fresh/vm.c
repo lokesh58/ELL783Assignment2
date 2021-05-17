@@ -55,7 +55,15 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 }
 
 int selectPage(struct proc *p) {
+#if defined(FIFO)
   return 0;
+#elif defined(SCFIFO)
+  return 0;
+#elif defined(NFU)
+  return 0;
+#else
+  panic("Incorrect page replacement algorithm. Did you forget to use all capitals?");
+#endif
 }
 
 //Pages out one page to swapFile of the process
