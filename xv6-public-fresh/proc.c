@@ -204,6 +204,43 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  char *buf = kalloc();
+  if(buf == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+  createSwapFile(np);
+  for(int i=0;i<MAX_PSYC_PAGES; ++i){
+    np->memPages[i] = curproc->memPages[i];
+  }
+  for(int i=0;i<MAX_TOTAL_PAGES;++i){
+    np->pagedOut[i]= curproc->pagedOut[i];
+    if(curproc->pagedOut[i] & PTE_P){
+      if(readFromSwapFile(curproc, buf, i*PGSIZE, PGSIZE)==-1){
+        kfree(np->kstack);
+        kfree(buf);
+        np->kstack = 0;
+        removeSwapFile(np);
+        np->state = UNUSED;
+        return -1;
+      }
+      if(writeToSwapFile(np, buf, i*PGSIZE, PGSIZE)==-1){
+        kfree(np->kstack);
+        kfree(buf);
+        np->kstack = 0;
+        removeSwapFile(np);
+        np->state = UNUSED;
+        return -1;
+      }
+    }
+  }
+  kfree(buf);
+  np->memPagesCnt=curproc->memPagesCnt;
+  np->pagedOutCnt=curproc->pagedOutCnt;
+  np->pageFaultCnt=0;
+  np->totalPagedOutCnt=curproc->pagedOutCnt;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
