@@ -51,7 +51,13 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   //Swap file. must initiate with create swap file
-  struct file *swapFile;      //page file
+  struct file *swapFile;       //page file
+  //Paging meta data
+  uint memPages[MAX_PSYC_PAGES];  //meta data about pages in memory
+  uint pagedOut[MAX_TOTAL_PAGES]; //meta data about pages in backing store (does not include pages in memory)
+  uint memPagesCnt;            // Number of pages in memory
+  uint pagesOutCnt;            // Current paged out
+  uint totalPagedOut;          // Total pages which were pages out
 };
 
 // Process memory is laid out contiguously, low addresses first:
