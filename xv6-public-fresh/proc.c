@@ -262,6 +262,32 @@ fork(void)
   return pid;
 }
 
+static void printProccessInformation(struct proc *p){
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
+  int i;
+  char *state;
+  uint pc[10];
+  if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+    state = states[p->state];
+  else
+    state = "???";
+  cprintf("%d %s %s", p->pid, state, p->name);
+  if(p->state == SLEEPING){
+    getcallerpcs((uint*)p->context->ebp+2, pc);
+    for(i=0; i<10 && pc[i] != 0; i++)
+      cprintf(" %p", pc[i]);
+  }
+  cprintf(" %d %d %d %d", p->memPagesCnt, p->pagedOutCnt, p->pageFaultCnt, p->totalPagedOutCnt);
+  cprintf("\n");
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -284,6 +310,10 @@ exit(void)
       curproc->ofile[fd] = 0;
     }
   }
+  
+  #ifdef TRUE
+  printProccessInformation(curproc);
+  #endif //TRUE
 
   begin_op();
   iput(curproc->cwd);
@@ -546,36 +576,13 @@ kill(int pid)
 void
 procdump(void)
 {
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [EMBRYO]    "embryo",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
-  int i;
   struct proc *p;
-  char *state;
-  uint pc[10];
-
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == UNUSED)
       continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-      state = states[p->state];
-    else
-      state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
-    if(p->state == SLEEPING){
-      getcallerpcs((uint*)p->context->ebp+2, pc);
-      for(i=0; i<10 && pc[i] != 0; i++)
-        cprintf(" %p", pc[i]);
-    }
-    cprintf("%d %d %d %d", p->memPagesCnt, p->pagedOutCnt, p->pageFaultCnt, p->totalPagedOutCnt);
-    cprintf("\n");
+    printProccessInformation(p);
   }
-  cprintf("%.3f%% free pages in the system\n", percentFreePages());
+  cprintf("%d%% free pages in the system\n", percentFreePages());
 }
 
 //timer interrupt calls this function if NFU is defined
