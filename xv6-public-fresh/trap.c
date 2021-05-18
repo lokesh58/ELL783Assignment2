@@ -48,11 +48,11 @@ trap(struct trapframe *tf)
 
   switch(tf->trapno){
   case T_IRQ0 + IRQ_TIMER:
-  #ifdef NFU
-    NFUaging();
-  #endif //NFU
     if(cpuid() == 0){
       acquire(&tickslock);
+    #ifdef NFU
+      NFUaging();
+    #endif //NFU
       ticks++;
       wakeup(&ticks);
       release(&tickslock);
