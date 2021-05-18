@@ -104,7 +104,7 @@ kalloc(void)
   return (char*)r;
 }
 
-float percentFreePages(){
-  return pageCount.currentFreePages/(float)pageCount.totalFreePages * 100;
+int percentFreePages(){
+  return pageCount.currentFreePages*100/pageCount.totalFreePages;
 }
 
