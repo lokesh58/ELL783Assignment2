@@ -585,8 +585,11 @@ void NFUaging() {
       if(!pte || !(*pte & PTE_P)) continue;
       int NFUcnt = NFU_CNT(p->memPages[i]);
       p->memPages[i] &= ~0xFFF; //Remove set bits of counter
-      p->memPages[i] |= NFUcnt|(*pte & PTE_A);
-      *pte &= ~PTE_A;
+      p->memPages[i] |= (NFUcnt>>1);
+      if(*pte & PTE_A){
+        *pte &= ~PTE_A;
+        p->memPages[i] |= 0x800; //in binary:1000 0000 0000
+      }
     }
   }
   release(&ptable.lock);
