@@ -587,6 +587,7 @@ void NFUaging() {
       if(!pte || !(*pte & PTE_P)) continue;
       p->memPages[i] &= ~0xFFF; //Remove set bits of counter
       p->memPages[i] |= (NFU_CNT(p->memPages[i])>>1)|(*pte & PTE_A);
+      *pte &= ~PTE_A;
     }
   }
   release(&ptable.lock);
