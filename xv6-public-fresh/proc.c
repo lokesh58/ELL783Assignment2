@@ -582,7 +582,10 @@ procdump(void)
       continue;
     printProccessInformation(p);
   }
-  cprintf("%d%% free pages in the system\n", percentFreePages());
+  float percentfree = percentFreePages();
+  int per1 = percentfree, per2 = percentfree*100;
+  per2 %= 100;//per1 is part before decimal, per2 is 2 digits after decimal
+  cprintf("%d.%d%% free pages in the system\n", per1, per2);
 }
 
 //timer interrupt calls this function if NFU is defined
