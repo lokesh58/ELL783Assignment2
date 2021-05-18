@@ -71,7 +71,7 @@ int selectPage(struct proc *p) {
     }
   }
 #elif defined(NFU)
-  int minCnt = (1<<7), index = -1; //max possible count is (1<<7)-1
+  int minCnt = (1<<12), index = -1; //max possible count is (1<<11)-1 (12 bits)
   for(int i=0; i<p->memPagesCnt; ++i){
     if(minCnt > NFU_CNT(p->memPages[i])){
       minCnt = NFU_CNT(p->memPages[i]);
