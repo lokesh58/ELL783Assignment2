@@ -59,7 +59,7 @@ int selectPage(struct proc *p) {
   return 0;
 #elif defined(SCFIFO)
   for(int i=0; ; i = (i+1)%p->memPagesCnt){
-    char *va = V_ADDR(p->memPages[i]);
+    char *va = (char*)V_ADDR(p->memPages[i]);
     pte_t *pte = walkpgdir(p->pgdir, va, 0);
     if(!pte || !(*pte & PTE_P)){
       panic("selectPage: SCFIFO: page in meta deta not in memory");
