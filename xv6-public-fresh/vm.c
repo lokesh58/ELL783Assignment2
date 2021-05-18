@@ -58,11 +58,31 @@ int selectPage(struct proc *p) {
 #if defined(FIFO)
   return 0;
 #elif defined(SCFIFO)
-  return 0;
+  for(int i=0; ; i = (i+1)%p->memPagesCnt){
+    char *va = V_ADDR(p->memPages[i]);
+    pte_t *pte = walkpgdir(p->pgdir, va, 0);
+    if(!pte || !(*pte & PTE_P)){
+      panic("selectPage: SCFIFO: page in meta deta not in memory");
+    }
+    if(*pte & PTE_A){
+      *pte &= ~PTE_A;
+    }else{
+      return i;
+    }
+  }
 #elif defined(NFU)
-  return 0;
+  int minCnt = (1<<7), index = -1; //max possible count is (1<<7)-1
+  for(int i=0; i<p->memPagesCnt; ++i){
+    if(minCnt > NFU_CNT(p->memPages[i])){
+      minCnt = NFU_CNT(p->memPages[i]);
+      index = i;
+    }
+  }
+  if(index == -1)
+    panic("selectPage: NFU: error in NFU_CNT");
+  return index;
 #else
-  panic("Incorrect page replacement algorithm. Did you forget to use all capitals?");
+  panic("Incorrect page replacement algorithm. Did you forget to use all capitals [FIFO, SCFIFO, NFU, NONE]?");
 #endif
 }
 
