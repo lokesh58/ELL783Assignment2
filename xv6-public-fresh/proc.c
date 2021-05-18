@@ -578,3 +578,19 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+//timer interrupt calls this function if NFU is defined
+void NFUaging() {
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; ++p){
+    if(p->state == UNUSED || p->pid <= 2) continue; //pid <= 2 means init or shell
+    for(int i=0; i<p->memPagesCnt; ++i){
+      uint *pte = walkpgdir(p->pgdir, (char*)V_ADDR(p->memPages[i]), 0);
+      if(!pte || !(*pte & PTE_P)) continue;
+      p->memPages[i] &= ~0xFFF; //Remove set bits of counter
+      p->memPages[i] |= (NFU_CNT(p->memPages[i])>>1)|(*pte & PTE_A);
+    }
+  }
+  release(&ptable.lock);
+}
