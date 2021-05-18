@@ -23,6 +23,11 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct {
+  uint totalFreePages;
+  uint currentFreePages;
+} pageCount;
+
 // Initialization happens in two phases.
 // 1. main() calls kinit1() while still using entrypgdir to place just
 // the pages mapped by entrypgdir on free list.
@@ -33,6 +38,7 @@ kinit1(void *vstart, void *vend)
 {
   initlock(&kmem.lock, "kmem");
   kmem.use_lock = 0;
+  pageCount.currentFreePages = 0; //freerange will increment this
   freerange(vstart, vend);
 }
 
@@ -40,6 +46,7 @@ void
 kinit2(void *vstart, void *vend)
 {
   freerange(vstart, vend);
+  pageCount.totalFreePages = pageCount.currentFreePages; //current free pages are all the pages available
   kmem.use_lock = 1;
 }
 
@@ -72,6 +79,7 @@ kfree(char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
+  pageCount.currentFreePages += 1;
   if(kmem.use_lock)
     release(&kmem.lock);
 }
@@ -87,10 +95,16 @@ kalloc(void)
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r) {
     kmem.freelist = r->next;
+    pageCount.currentFreePages -= 1;
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
   return (char*)r;
+}
+
+float percentFreePages(){
+  return pageCount.currentFreePages/(float)pageCount.totalFreePages * 100;
 }
 
