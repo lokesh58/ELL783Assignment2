@@ -128,14 +128,6 @@ userinit(void)
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
-  createSwapFile(p);
-  for(int i=0;i<MAX_TOTAL_PAGES;++i){
-    p->pagedOut[i]=0;
-  }
-  p->memPagesCnt=0;
-  p->pagedOutCnt=0;
-  p->pageFaultCnt=0;
-  p->totalPagedOutCnt=0;
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
   memset(p->tf, 0, sizeof(*p->tf));
@@ -204,43 +196,47 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
-  char *buf = kalloc();
-  if(buf == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-  createSwapFile(np);
-  for(int i=0;i<MAX_PSYC_PAGES; ++i){
-    np->memPages[i] = curproc->memPages[i];
-  }
-  for(int i=0;i<MAX_TOTAL_PAGES;++i){
-    np->pagedOut[i]= curproc->pagedOut[i];
-    if(curproc->pagedOut[i] & PTE_P){
-      if(readFromSwapFile(curproc, buf, i*PGSIZE, PGSIZE)==-1){
-        kfree(np->kstack);
-        kfree(buf);
-        np->kstack = 0;
-        removeSwapFile(np);
-        np->state = UNUSED;
-        return -1;
-      }
-      if(writeToSwapFile(np, buf, i*PGSIZE, PGSIZE)==-1){
-        kfree(np->kstack);
-        kfree(buf);
-        np->kstack = 0;
-        removeSwapFile(np);
-        np->state = UNUSED;
-        return -1;
+  if(np->pid > 2) {
+    char *buf = kalloc();
+    if(buf == 0){
+      kfree(np->kstack);
+      np->kstack = 0;
+      np->state = UNUSED;
+      return -1;
+    }
+    createSwapFile(np);
+    for(int i=0;i<MAX_PSYC_PAGES; ++i){
+      np->memPages[i] = curproc->memPages[i];
+    }
+    if(curproc->pid > 2){
+      for(int i=0;i<MAX_TOTAL_PAGES;++i){
+        np->pagedOut[i]= curproc->pagedOut[i];
+        if(curproc->pagedOut[i] & PTE_P){
+          if(readFromSwapFile(curproc, buf, i*PGSIZE, PGSIZE)==-1){
+            kfree(np->kstack);
+            kfree(buf);
+            np->kstack = 0;
+            removeSwapFile(np);
+            np->state = UNUSED;
+            return -1;
+          }
+          if(writeToSwapFile(np, buf, i*PGSIZE, PGSIZE)==-1){
+            kfree(np->kstack);
+            kfree(buf);
+            np->kstack = 0;
+            removeSwapFile(np);
+            np->state = UNUSED;
+            return -1;
+          }
+        }
       }
     }
+    kfree(buf);
+    np->memPagesCnt=curproc->memPagesCnt;
+    np->pagedOutCnt=curproc->pagedOutCnt;
+    np->pageFaultCnt=0;
+    np->totalPagedOutCnt=curproc->pagedOutCnt;
   }
-  kfree(buf);
-  np->memPagesCnt=curproc->memPagesCnt;
-  np->pagedOutCnt=curproc->pagedOutCnt;
-  np->pageFaultCnt=0;
-  np->totalPagedOutCnt=curproc->pagedOutCnt;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -278,7 +274,9 @@ exit(void)
 
   if(curproc == initproc)
     panic("init exiting");
-
+  
+  if(curproc->pid > 2)
+    removeSwapFile(curproc);
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
@@ -335,7 +333,6 @@ wait(void)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
-        removeSwapFile(p);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
