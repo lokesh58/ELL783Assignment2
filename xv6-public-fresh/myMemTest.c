@@ -24,28 +24,28 @@ int main(int argc, char *argv[]){
   char *str[20];
   for(int i=0;i<15;++i){
     str[i] = sbrk(PGSIZE);
-    //used sbrk instead of malloc because malloc was allocating extra memory
-    //sbrk gives better control
   }
   printf(1, "Printing to not get variable unused warning str=0x%x\n", str);
   breakpoint();
   str[15] = sbrk(PGSIZE);
   breakpoint();
+  for(int k=0;k<1000;++k)
+    str[1][0] = 'a';
   str[16] = sbrk(PGSIZE);
   breakpoint();
-  str[2][0] = 'a'; //use page 2
+  for(int k=0;k<1000;++k)
+    str[1][0] = 'a';
   breakpoint();
   str[17] = sbrk(PGSIZE);
-  breakpoint();
   str[18] = sbrk(PGSIZE);
-  breakpoint();
-  str[2][0] = 'b'; //use page 2
+  str[1][0] = 'a';
   breakpoint();
   int pid = fork();
   if(pid == 0){
     printf(1, "Child pid=%d\n", getpid());
-    sbrk(-PGSIZE); //delete page 18, free space in memory
-    str[0][0] = 'a'; //use 0
+    sbrk(-PGSIZE);
+    breakpoint();
+    str[0][0] = 'a';
     breakpoint();
     exit();
   }else if(pid > 0){
