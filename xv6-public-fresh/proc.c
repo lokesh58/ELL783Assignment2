@@ -572,8 +572,10 @@ procdump(void)
       for(i=0; i<10 && pc[i] != 0; i++)
         cprintf(" %p", pc[i]);
     }
+    cprintf("%d %d %d %d", p->memPagesCnt, p->pagedOutCnt, p->pageFaultCnt, p->totalPagedOutCnt);
     cprintf("\n");
   }
+  cprintf("%.3f%% free pages in the system\n", percentFreePages());
 }
 
 //timer interrupt calls this function if NFU is defined
