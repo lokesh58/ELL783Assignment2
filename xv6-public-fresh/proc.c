@@ -212,22 +212,8 @@ fork(void)
       for(int i=0;i<MAX_TOTAL_PAGES;++i){
         np->pagedOut[i]= curproc->pagedOut[i];
         if(curproc->pagedOut[i] & PTE_P){
-          if(readFromSwapFile(curproc, buf, i*PGSIZE, PGSIZE)==-1){
-            kfree(np->kstack);
-            kfree(buf);
-            np->kstack = 0;
-            removeSwapFile(np);
-            np->state = UNUSED;
-            return -1;
-          }
-          if(writeToSwapFile(np, buf, i*PGSIZE, PGSIZE)==-1){
-            kfree(np->kstack);
-            kfree(buf);
-            np->kstack = 0;
-            removeSwapFile(np);
-            np->state = UNUSED;
-            return -1;
-          }
+          readFromSwapFile(curproc, buf, i*PGSIZE, PGSIZE);
+          writeToSwapFile(np, buf, i*PGSIZE, PGSIZE);
         }
       }
     }
@@ -593,7 +579,7 @@ void NFUaging() {
   struct proc *p;
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; ++p){
-    if(p->state == UNUSED || p->pid <= 2) continue; //pid <= 2 means init or shell
+    if(p->state == UNUSED || p->state == SLEEPING || p->pid <= 2) continue; //pid <= 2 means init or shell
     for(int i=0; i<p->memPagesCnt; ++i){
       uint *pte = walkpgdir(p->pgdir, (char*)V_ADDR(p->memPages[i]), 0);
       if(!pte || !(*pte & PTE_P)) continue;
