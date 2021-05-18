@@ -583,8 +583,9 @@ void NFUaging() {
     for(int i=0; i<p->memPagesCnt; ++i){
       uint *pte = walkpgdir(p->pgdir, (char*)V_ADDR(p->memPages[i]), 0);
       if(!pte || !(*pte & PTE_P)) continue;
+      int NFUcnt = NFU_CNT(p->memPages[i]);
       p->memPages[i] &= ~0xFFF; //Remove set bits of counter
-      p->memPages[i] |= (NFU_CNT(p->memPages[i])>>1)|(*pte & PTE_A);
+      p->memPages[i] |= NFUcnt|(*pte & PTE_A);
       *pte &= ~PTE_A;
     }
   }
