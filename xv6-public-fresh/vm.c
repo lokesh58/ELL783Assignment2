@@ -144,7 +144,7 @@ void removePageMetaData(struct proc *p, uint va) {
       }
     }
     if(i == p->memPagesCnt)
-      panic("removePageMetaData: va not found");
+      return;
     for(int j=i+1;j < p->memPagesCnt; ++j){
       p->memPages[j-1] = p->memPages[j];
     }
@@ -165,7 +165,6 @@ void removePagedOutMetaData(struct proc *p, uint va) {
       return;
     }
   }
-  panic("removePagedOutMetaData: va not found");
 #endif //NONE
 }
 
