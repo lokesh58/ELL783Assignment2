@@ -111,7 +111,8 @@ void pageOut(struct proc *p) {
   if(pa == 0)
     panic("kfree");
   char *v = P2V(pa);
-  writeToSwapFile(p, v, pos*PGSIZE, PGSIZE);
+  if(writeToSwapFile(p, v, pos*PGSIZE, PGSIZE)==-1)
+    panic("pageOut: unable to write to swapfile");
   p->pagedOut[pos] = va | PTE_P;
   p->pagedOutCnt += 1;
   p->totalPagedOutCnt += 1;
@@ -124,6 +125,7 @@ void pageOut(struct proc *p) {
 void addPageMetaData(struct proc *p, uint va) {
   if(p == 0) return;
 #ifndef NONE
+  va = V_ADDR(va);
   if(p->pid > 2){
     while(p->memPagesCnt >= MAX_PSYC_PAGES)
       pageOut(p);
@@ -136,6 +138,7 @@ void addPageMetaData(struct proc *p, uint va) {
 void removePageMetaData(struct proc *p, uint va) {
   if(p == 0) return;
 #ifndef NONE
+  va = V_ADDR(va);
   if(p->pid > 2){
     int i;
     for(i=0;i < p->memPagesCnt; ++i){
@@ -158,6 +161,7 @@ void removePagedOutMetaData(struct proc *p, uint va) {
   if(p == 0) return;
   if(p->pid <= 2)
     panic("removePagedOutMetaData: init or shell trying to remove paged out data");
+  va = V_ADDR(va);
   for(int i=0; i<MAX_TOTAL_PAGES; ++i){
     if((p->pagedOut[i] & PTE_P) && V_ADDR(p->pagedOut[i]) == va){
       p->pagedOut[i] = 0;
@@ -198,6 +202,7 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm, int addMetaData)
 void pageIn(struct proc *p, uint va) {
 #ifndef NONE
   if(p == 0 || p->pid <= 2) return;
+  va = V_ADDR(va);
   while(p->memPagesCnt >= MAX_PSYC_PAGES)
     pageOut(p);
   int pos;
@@ -210,7 +215,8 @@ void pageIn(struct proc *p, uint va) {
   char *mem = kalloc();
   if(mem == 0)
     panic("pageIn: out of space");
-  readFromSwapFile(p, mem, pos*PGSIZE, PGSIZE);
+  if(readFromSwapFile(p, mem, pos*PGSIZE, PGSIZE)==-1)
+    panic("pageIn: unable to read from swap file");
   p->pagedOut[pos] = 0;
   p->pagedOutCnt -= 1;
   if(mappages(p->pgdir, (char*)va, PGSIZE, V2P(mem), PTE_W|PTE_U, 1)==-1)
